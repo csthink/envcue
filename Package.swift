@@ -12,11 +12,17 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
+        // TOML load/save for layer files and config.toml (T1.2). toml++-backed parser
+        // chosen over a hand-rolled one to avoid subtle quoting/escaping corruption.
+        .package(url: "https://github.com/LebJe/TOMLKit.git", from: "0.6.0"),
     ],
     targets: [
         // MARK: - Libraries (pure-logic first, side effects later)
         .target(
-            name: "EnvCueCore"
+            name: "EnvCueCore",
+            dependencies: [
+                .product(name: "TOMLKit", package: "TOMLKit"),
+            ]
         ),
         .target(
             name: "EnvCueKeychain",
