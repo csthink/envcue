@@ -1,0 +1,23 @@
+# --- EnvCue: docs 不进远程仓库(设计文档为本地唯一事实来源,不公开) ---
+docs/
+
+# --- Swift Package Manager ---
+.build/
+.swiftpm/
+Package.resolved
+
+# --- Xcode ---
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+
+# --- macOS ---
+.DS_Store
+
+# --- 编辑器 / 杂项 ---
+.idea/
+*.swp
+*~
