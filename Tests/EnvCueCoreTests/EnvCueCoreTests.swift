@@ -146,6 +146,19 @@ import Testing
     #expect(text.contains("export TRICKY=\"a\\\"b\\$c\\`d\\\\e\""))
 }
 
+@Test func serializeEscapesSingleQuotesInSceneNameAndAccount() {
+    // Scene names and accounts are user-controlled and land inside single-quoted shell
+    // strings (the secret line's `--account '...'` and the `_ENVCUE_NOTICE='… → <scene>'`).
+    // A literal `'` must be neutralized via the `'\''` idiom, or it would break the quoting
+    // and could inject zsh into the sourced snapshot.
+    let env = EnvCueCore.evaluate(base: Layer(name: "base", entries: [
+        .secret("K", account: "wei'rd/ACCOUNT"),
+    ]))
+    let text = EnvCueCore.serialize(env, activeScene: "ev'il")
+    #expect(text.contains("--account 'wei'\\''rd/ACCOUNT'"))
+    #expect(text.contains("→ ev'\\''il'"))
+}
+
 // MARK: - Generation (T1.6, invariant #5): content-only fingerprint, scene-name-free
 
 @Test func generationStableForSameContent() {
