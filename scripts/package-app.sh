@@ -28,8 +28,12 @@ OUT="${ENVCUE_APP_OUT:-.build/EnvCue.app}"
 ICON_SRC="assets/icon/envcue-icon-1024.png"
 [ -f "$ICON_SRC" ] || { echo "missing icon source: $ICON_SRC" >&2; exit 1; }
 
-echo "==> swift build -c release"
-swift build -c release
+echo "==> swift build -c release ${ENVCUE_SWIFT_BUILD_FLAGS:-}"
+# Extra build flags from the caller (the Homebrew formula passes --disable-sandbox so
+# SwiftPM can fetch dependencies inside brew's no-network build sandbox). Intentional
+# word-splitting of the flag string.
+# shellcheck disable=SC2086
+swift build -c release ${ENVCUE_SWIFT_BUILD_FLAGS:-}
 BIN=".build/release/envcue"
 [ -x "$BIN" ] || { echo "build did not produce $BIN" >&2; exit 1; }
 

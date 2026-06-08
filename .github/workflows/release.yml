@@ -1,0 +1,69 @@
+name: release
+
+# On a `v*` tag, publish the Homebrew formula to the tap. Source-build formula → no macOS
+# runner needed here: we only compute the sha256 of GitHub's source tarball, render the
+# formula template, and push it to csthink/homebrew-tap. The user's machine compiles on
+# `brew install` with Xcode 26.
+#
+# Maintainer setup (one-time):
+#   - tap repo csthink/homebrew-tap must exist (a Formula/ dir is created if absent).
+#   - secret HOMEBREW_TAP_TOKEN: a fine-grained PAT scoped to csthink/homebrew-tap with
+#     Contents: Read and write. PATs expire — set a renewal reminder after release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  update-tap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute version, url, sha256
+        id: meta
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${tag}.tar.gz"
+          # GitHub's source tarball is byte-stable per tag, so its sha256 is a valid pin.
+          sha="$(curl -fsSL "$url" | sha256sum | awk '{print $1}')"
+          {
+            echo "version=$version"
+            echo "url=$url"
+            echo "sha=$sha"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Render formula from template
+        run: |
+          mkdir -p out
+          sed -e "s|@@URL@@|${{ steps.meta.outputs.url }}|" \
+              -e "s|@@VERSION@@|${{ steps.meta.outputs.version }}|" \
+              -e "s|@@SHA256@@|${{ steps.meta.outputs.sha }}|" \
+              packaging/envcue.rb.tmpl > out/envcue.rb
+          echo "----- rendered Formula/envcue.rb -----"
+          cat out/envcue.rb
+
+      - name: Push formula to csthink/homebrew-tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "${TAP_TOKEN}" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN secret is not set" >&2
+            exit 1
+          fi
+          git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/csthink/homebrew-tap.git" tap
+          mkdir -p tap/Formula
+          cp out/envcue.rb tap/Formula/envcue.rb
+          cd tap
+          git config user.name "envcue-release[bot]"
+          git config user.email "envcue-release@users.noreply.github.com"
+          git add Formula/envcue.rb
+          if git diff --cached --quiet; then
+            echo "formula unchanged; nothing to push"
+          else
+            git commit -m "envcue ${{ steps.meta.outputs.version }}"
+            git push
+          fi
