@@ -25,6 +25,10 @@ public extension EnvCueCore {
                 guard let vt = vars[key]?.table else {
                     throw EnvCueCoreError.malformedFile(name: name)
                 }
+                // Shell-safety gate (PROPOSAL-001 / G3): reject any name that would inject
+                // into the sourced snapshot — checked before the value/account so a bad
+                // (possibly shared) file is rejected regardless of kind.
+                try validateVarName(key, layer: name)
                 guard let kindStr = vt["kind"]?.string else {
                     throw EnvCueCoreError.missingField(name: key, field: "kind")
                 }
@@ -38,6 +42,7 @@ public extension EnvCueCore {
                     guard let account = vt["account"]?.string else {
                         throw EnvCueCoreError.missingField(name: key, field: "account")
                     }
+                    try validateAccount(account, layer: name, variable: key)
                     entries.append(.secret(key, account: account))
                 case VarKind.unset.rawValue:
                     entries.append(.unset(key))

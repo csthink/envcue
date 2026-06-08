@@ -22,6 +22,14 @@ public enum EnvCueCoreError: Error, Equatable, CustomStringConvertible {
     case missingField(name: String, field: String)
     /// A `kind`/`secret_backend` value outside the known set.
     case unknownValue(context: String, value: String)
+    /// A variable name that is not a legal POSIX env name (PROPOSAL-001 / G3 shell-safety).
+    case illegalVarName(name: String, layer: String)
+    /// A Keychain account reference containing characters unsafe in the sourced snapshot.
+    case illegalAccount(layer: String, variable: String)
+    /// A layer name unsafe as a filename component / account prefix.
+    case illegalLayerName(layer: String)
+    /// `PATH` appeared in a layer — envcue performs zero PATH operations (NFR-4).
+    case pathManagedExternally(layer: String)
 
     public var description: String {
         switch self {
@@ -31,6 +39,14 @@ public enum EnvCueCoreError: Error, Equatable, CustomStringConvertible {
             return "envcue: variable '\(name)' is missing required field '\(field)'"
         case let .unknownValue(context, value):
             return "envcue: unknown value '\(value)' in \(context)"
+        case let .illegalVarName(name, layer):
+            return "envcue: layer '\(layer)' variable name '\(name)' is illegal — allowed: letters, digits, underscore; must not start with a digit. Fix the layer file."
+        case let .illegalAccount(layer, variable):
+            return "envcue: layer '\(layer)' variable '\(variable)' has an illegal Keychain account reference (only letters, digits, and '_ / . -' are allowed). Fix the layer file."
+        case let .illegalLayerName(layer):
+            return "envcue: layer name '\(layer)' is illegal — allowed: letters, digits, underscore, hyphen."
+        case let .pathManagedExternally(layer):
+            return "envcue: 'PATH' is delegated to mise/direnv and is never managed by envcue (zero-PATH policy) — remove it from layer '\(layer)'."
         }
     }
 }

