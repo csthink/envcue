@@ -15,26 +15,12 @@ if arguments.isEmpty {
     // GUI mode — launch the MenuBarExtra agent (T5). Never returns.
     runGUI()
 } else {
-    // CLI mode. Parse with ArgumentParser (so bad args / --help render usage nicely), then
-    // run — surfacing run-time errors as a single readable line on stderr rather than a
-    // backtrace (project rule: user-facing errors are human-readable; no key ever appears
-    // because our error types are secret-free by construction).
-    do {
-        var command = try EnvCue.parseAsRoot(arguments)
-        do {
-            try command.run()
-        } catch let exit as ExitCode {
-            EnvCue.exit(withError: exit) // honor explicit exit codes (message already printed)
-        } catch {
-            // String(describing:) prefers an error's CustomStringConvertible description —
-            // all our error types provide a readable, secret-free one.
-            printErr(String(describing: error))
-            EnvCue.exit(withError: ExitCode.failure)
-        }
-    } catch {
-        // Parse / validation / help request — ArgumentParser renders usage + help.
-        EnvCue.exit(withError: error)
-    }
+    // CLI mode. ParsableCommand.main parses, runs, and renders --help / usage / parse
+    // errors / ExitCode / run-time errors correctly, exiting with the right status. (The
+    // earlier hand-rolled parse-then-run split swallowed ArgumentParser's `helpRequested`
+    // into the run-time catch, so `--help` dumped a CommandError instead of the usage text.)
+    // Our command/error types print human-readable, secret-free messages by construction.
+    EnvCue.main(arguments)
 }
 
 struct EnvCue: ParsableCommand {
@@ -44,7 +30,7 @@ struct EnvCue: ParsableCommand {
         discussion: """
         Switch named environment scenes (base + one mutually-exclusive scene) per terminal.
         Secrets live in the Keychain and travel via a stdout pipe — never argv or history.
-        Launching without arguments starts GUI mode (placeholder until T5).
+        Launching without arguments starts the menu-bar app.
         """,
         subcommands: [
             SceneCommand.self,
