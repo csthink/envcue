@@ -1,11 +1,12 @@
 // envcue — double-mode entry (design §1.1).
 //
-//   has subcommand argv  → CLI mode (EnvCueCLI command tree; subcommands land in T4)
+//   has subcommand argv  → CLI mode (EnvCue command tree, assembled in T4)
 //   no argv (launched as the .app) → GUI mode (MenuBarExtra; arrives in T5)
 //
-// T0 ships only the skeleton: the CLI root prints usage via swift-argument-parser, and
-// the GUI branch prints a placeholder and exits (no AppKit/SwiftUI dependency yet).
+// The CLI subcommands are thin wrappers over EnvCueCore/Keychain/Shell (see Commands.swift
+// + CLIContext.swift). The GUI branch still prints a placeholder until T5.
 
+import Foundation
 import ArgumentParser
 
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -14,8 +15,26 @@ if arguments.isEmpty {
     // GUI mode placeholder — the real MenuBarExtra agent arrives in T5.
     print("envcue: GUI mode placeholder (MenuBarExtra arrives in T5). Run `envcue --help` for CLI usage.")
 } else {
-    // CLI mode — ArgumentParser handles parsing, `--help`, and exit codes.
-    EnvCue.main(arguments)
+    // CLI mode. Parse with ArgumentParser (so bad args / --help render usage nicely), then
+    // run — surfacing run-time errors as a single readable line on stderr rather than a
+    // backtrace (project rule: user-facing errors are human-readable; no key ever appears
+    // because our error types are secret-free by construction).
+    do {
+        var command = try EnvCue.parseAsRoot(arguments)
+        do {
+            try command.run()
+        } catch let exit as ExitCode {
+            EnvCue.exit(withError: exit) // honor explicit exit codes (message already printed)
+        } catch {
+            // String(describing:) prefers an error's CustomStringConvertible description —
+            // all our error types provide a readable, secret-free one.
+            printErr(String(describing: error))
+            EnvCue.exit(withError: ExitCode.failure)
+        }
+    } catch {
+        // Parse / validation / help request — ArgumentParser renders usage + help.
+        EnvCue.exit(withError: error)
+    }
 }
 
 struct EnvCue: ParsableCommand {
@@ -23,9 +42,20 @@ struct EnvCue: ParsableCommand {
         commandName: "envcue",
         abstract: "Per-terminal environment layer switcher for macOS + zsh.",
         discussion: """
-        Skeleton entry (T0). Subcommands (scene / eval / diff / status / snapshot /
-        secret / install / uninstall) are assembled in T4. Launching without arguments
-        starts GUI mode (placeholder until T5).
-        """
+        Switch named environment scenes (base + one mutually-exclusive scene) per terminal.
+        Secrets live in the Keychain and travel via a stdout pipe — never argv or history.
+        Launching without arguments starts GUI mode (placeholder until T5).
+        """,
+        subcommands: [
+            SceneCommand.self,
+            EvalCommand.self,
+            DiffCommand.self,
+            SnapshotCommand.self,
+            StatusCommand.self,
+            SecretCommand.self,
+            KeychainGetCommand.self,
+            InstallCommand.self,
+            UninstallCommand.self,
+        ]
     )
 }
