@@ -1,0 +1,34 @@
+<!--
+  EnvCue app-icon source (T5.5). Concept: the bash variable-expansion token
+  "${ }" with a block terminal cursor between the braces — signalling a shell
+  environment variable. Flat fills, no baked glass/shadow/highlight: Icon
+  Composer adds the Liquid Glass material and generates the four appearances.
+
+  Before importing into Icon Composer:
+    1. Outline the <text> glyphs (Text -> Outlines) so they are font-independent
+       paths. The cursor is already a <rect>.
+    2. Import each group as its own layer for per-plate glass depth:
+         background / braces / dollar / cursor
+       ($ + cursor are the bright accent; braces are the mid-blue secondary.)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img">
+  <defs>
+    <linearGradient id="backgroundGradient" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1A237E"/>
+      <stop offset="1" stop-color="#0D47A1"/>
+    </linearGradient>
+  </defs>
+  <g id="background">
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#backgroundGradient)"/>
+  </g>
+  <g id="dollar" fill="#E3F2FD">
+    <text x="172" y="512" font-family="SF Mono, Menlo, Courier New, monospace" font-size="430" font-weight="800" dominant-baseline="central" text-anchor="start">$</text>
+  </g>
+  <g id="braces" fill="#64B5F6">
+    <text x="374" y="512" font-family="SF Mono, Menlo, Courier New, monospace" font-size="430" font-weight="800" dominant-baseline="central" text-anchor="start">{</text>
+    <text x="720" y="512" font-family="SF Mono, Menlo, Courier New, monospace" font-size="430" font-weight="800" dominant-baseline="central" text-anchor="start">}</text>
+  </g>
+  <g id="cursor">
+    <rect x="556" y="362" width="118" height="300" rx="18" ry="18" fill="#E3F2FD"/>
+  </g>
+</svg>
