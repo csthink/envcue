@@ -91,37 +91,55 @@ struct CLIContext {
 
     // MARK: - The apply path (single writer; design §10)
 
-    /// Switch the active scene: evaluate → diff preview → confirm → atomic commit → update
-    /// active. `target == nil` means base-only (`--none`). Nothing is written if the user
-    /// declines the confirmation. Loading the target strictly (above) means a bad scene
-    /// name fails before any mutation.
-    func applyScene(target: String?, yes: Bool) throws {
+    /// A planned switch: the change preview plus the resolved target environment to commit.
+    /// Produced by `planSwitch` (read-only), consumed by `commitSwitch` (the only writer).
+    struct SwitchPlan {
+        let target: String?
+        let changes: [Change]
+        let next: ResolvedEnv
+    }
+
+    /// Read-only half of the apply path (design §10): evaluate current→target and diff. No
+    /// file is written here. Shared verbatim by the CLI `scene` command and the GUI's inline
+    /// diff preview, so evaluation lives in exactly one place (invariant #1 / NFR-6). A bad
+    /// scene name fails here (loadSceneStrict) before anything downstream runs.
+    func planSwitch(target: String?) throws -> SwitchPlan {
         let config = try loadConfig()
         let base = try loadBase()
-
         let current = EnvCueCore.evaluate(base: base, scene: try loadSceneOptional(config.active))
         let next = EnvCueCore.evaluate(base: base, scene: try loadSceneStrict(target))
-        let changes = EnvCueCore.diff(current: current, next: next)
+        return SwitchPlan(target: target, changes: EnvCueCore.diff(current: current, next: next), next: next)
+    }
+
+    /// Writing half of the apply path: commit state first (snapshot + manifest, generation
+    /// last — design §10), then move the active pointer. Generation excludes the scene name,
+    /// so a switch between two scenes that resolve to the same env leaves generation
+    /// unchanged: existing terminals stay quiet (honest), the menu bar still updates from
+    /// config.active. The single writer for both CLI and GUI switches.
+    func commitSwitch(_ plan: SwitchPlan) throws {
+        let config = try loadConfig()
+        try commitState(env: plan.next, activeScene: plan.target)
+        try writeActive(plan.target, config: config)
+    }
+
+    /// Switch the active scene: plan (eval → diff) → confirm → commit. `target == nil` means
+    /// base-only (`--none`). Nothing is written if the user declines the confirmation.
+    func applyScene(target: String?, yes: Bool) throws {
+        let plan = try planSwitch(target: target)
         let label = target ?? "base"
 
-        printDiff(changes, targetLabel: label)
+        printDiff(plan.changes, targetLabel: label)
 
-        if !changes.isEmpty && !yes {
+        if !plan.changes.isEmpty && !yes {
             guard confirm() else {
                 print("envcue: aborted. No changes written.")
                 return
             }
         }
 
-        // Commit state first (snapshot + manifest, generation last), then move the active
-        // pointer — the order in design §10. Generation excludes the scene name, so a
-        // switch between two scenes that resolve to the same env leaves generation
-        // unchanged: existing terminals stay quiet (honest), the menu bar still updates
-        // from config.active.
-        try commitState(env: next, activeScene: target)
-        try writeActive(target, config: config)
+        try commitSwitch(plan)
 
-        if changes.isEmpty {
+        if plan.changes.isEmpty {
             print("envcue: '\(label)' is now active (environment unchanged).")
         } else {
             print("envcue: switched to '\(label)'.")

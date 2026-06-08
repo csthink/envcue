@@ -12,8 +12,8 @@ import ArgumentParser
 let arguments = Array(CommandLine.arguments.dropFirst())
 
 if arguments.isEmpty {
-    // GUI mode placeholder — the real MenuBarExtra agent arrives in T5.
-    print("envcue: GUI mode placeholder (MenuBarExtra arrives in T5). Run `envcue --help` for CLI usage.")
+    // GUI mode — launch the MenuBarExtra agent (T5). Never returns.
+    runGUI()
 } else {
     // CLI mode. Parse with ArgumentParser (so bad args / --help render usage nicely), then
     // run — surfacing run-time errors as a single readable line on stderr rather than a
