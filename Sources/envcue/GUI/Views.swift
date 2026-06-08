@@ -10,6 +10,7 @@
 // surface stays a single pane of glass refracting the desktop — no opaque modal sheet.
 
 import SwiftUI
+import AppKit
 import EnvCueCore
 
 // MARK: - Menu content (hosted by MenuBarExtra .window)
@@ -28,8 +29,12 @@ struct MenuView: View {
                     DiffPreviewView(model: model, pending: pending)
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
                 } else {
-                    sceneList
-                        .transition(.opacity)
+                    VStack(alignment: .leading, spacing: 12) {
+                        sceneList
+                        Divider().opacity(0.5)
+                        quitFooter
+                    }
+                    .transition(.opacity)
                 }
             }
             .padding(16)
@@ -53,7 +58,7 @@ struct MenuView: View {
     }
 
     private var sceneList: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 2) {
             ForEach(model.options) { option in
                 SceneRow(
                     option: option,
@@ -63,13 +68,45 @@ struct MenuView: View {
             }
         }
     }
+
+    /// A menu-bar agent has no Dock icon or app menu, so the menu itself carries the two
+    /// baseline affordances: About and Quit. Rendered as flat list rows (leading icon, label,
+    /// trailing shortcut) in the resting state only — the diff preview owns Cancel/Apply.
+    private var quitFooter: some View {
+        VStack(spacing: 2) {
+            MenuActionRow(systemImage: "info.circle", title: "About EnvCue") {
+                AboutPresenter.shared.show() // crisp bundle icon + raised above the popup
+            }
+            MenuActionRow(systemImage: "power", title: "Quit", shortcut: "⌘Q") {
+                NSApplication.shared.terminate(nil)
+            }
+            .keyboardShortcut("q") // ⌘Q
+        }
+    }
 }
 
-/// One scene row: a glass button with a leading state glyph and trailing checkmark.
+/// A flat, full-width menu row with a hover highlight and no drop shadow — the shared look
+/// for scene rows and the About/Quit actions, modelled on a standard menu-bar dropdown.
+/// (Supersedes the per-row `.glass` pills, whose dark-mode shadow read as floating cards.)
+private struct MenuRowSurface: ViewModifier {
+    let highlighted: Bool
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(.rect)
+            .background(RoundedRectangle(cornerRadius: 8).fill(.primary.opacity(highlighted ? 0.08 : 0)))
+    }
+}
+
+/// One scene row: a flat list row with a leading state glyph and trailing checkmark. Hover
+/// highlights it; the active scene is checked and non-interactive.
 private struct SceneRow: View {
     let option: SceneOption
     let isActive: Bool
     let action: () -> Void
+    @State private var hover = false
 
     var body: some View {
         Button(action: action) {
@@ -77,16 +114,43 @@ private struct SceneRow: View {
                 Image(systemName: option.name == nil ? "circle.slash" : "circle.fill")
                     .font(.caption2)
                     .foregroundStyle(isActive ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    .frame(width: 16)
                 Text(option.title)
                 Spacer()
                 if isActive {
-                    Image(systemName: "checkmark").font(.callout.weight(.semibold))
+                    Image(systemName: "checkmark").font(.callout.weight(.semibold)).foregroundStyle(.secondary)
                 }
             }
-            .contentShape(.rect)
+            .modifier(MenuRowSurface(highlighted: hover && !isActive))
         }
-        .buttonStyle(.glass)
+        .buttonStyle(.plain)
         .disabled(isActive)
+        .onHover { hover = $0 }
+    }
+}
+
+/// A footer action row (About / Quit): leading icon, label, optional trailing shortcut.
+private struct MenuActionRow: View {
+    let systemImage: String
+    let title: String
+    var shortcut: String? = nil
+    let action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: systemImage).font(.caption).foregroundStyle(.secondary).frame(width: 16)
+                Text(title)
+                Spacer()
+                if let shortcut {
+                    Text(shortcut).font(.caption).foregroundStyle(.tertiary)
+                }
+            }
+            .modifier(MenuRowSurface(highlighted: hover))
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
     }
 }
 

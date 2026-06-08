@@ -78,6 +78,56 @@ struct PreviewApp: App {
     }
 }
 
+/// Presents the standard About panel reliably from a menu-bar agent. Two fixes over a bare
+/// `orderFrontStandardAboutPanel(nil)`:
+///   1. Pass the bundle icon EXPLICITLY via `.applicationIcon` — the panel otherwise renders
+///      a low-res placeholder (it does not honor `applicationIconImage`, and a process
+///      launched outside LaunchServices has no registered icon). A 1024px source scaled down
+///      is crisp.
+///   2. Raise the panel above the menu-bar popup (which floats at `.popUpMenu` level and would
+///      otherwise occlude it); making it key also dismisses the popup. A weak ref handles the
+///      panel's reuse on subsequent opens.
+@MainActor
+final class AboutPresenter {
+    static let shared = AboutPresenter()
+    private weak var panel: NSWindow?
+
+    func show() {
+        NSApp.activate(ignoringOtherApps: true)
+        if let panel {            // reuse the already-created panel
+            raise(panel)
+            return
+        }
+        var options: [NSApplication.AboutPanelOptionKey: Any] = [:]
+        if let icon = Self.bundleIcon() { options[.applicationIcon] = icon }
+        let before = Set(NSApp.windows)
+        NSApp.orderFrontStandardAboutPanel(options: options)
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if let new = NSApp.windows.first(where: { $0.isVisible && !before.contains($0) }) {
+                self.panel = new
+                self.raise(new)
+            }
+        }
+    }
+
+    private func raise(_ w: NSWindow) {
+        w.level = .popUpMenu          // match the menu popup's level…
+        w.makeKeyAndOrderFront(nil)   // …and become key so the popup dismisses
+        w.orderFrontRegardless()
+    }
+
+    /// Bundle icon as a high-res image: prefer the 1024 PNG (clean downscale), fall back to
+    /// the multi-rep icns. Nil only if neither resource resolves (e.g. a non-bundle launch).
+    private static func bundleIcon() -> NSImage? {
+        if let url = Bundle.main.url(forResource: "envcue-icon-1024", withExtension: "png"),
+           let img = NSImage(contentsOf: url) { return img }
+        if let url = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+           let img = NSImage(contentsOf: url) { return img }
+        return nil
+    }
+}
+
 /// Sets the activation policy: menu-bar accessory normally, regular (visible window) when
 /// the preview harness is on so a window appears and can be screen-captured.
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -85,6 +135,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let preview = ProcessInfo.processInfo.environment["ENVCUE_GUI_PREVIEW"] != nil
         NSApp.setActivationPolicy(preview ? .regular : .accessory)
         if preview { NSApp.activate(ignoringOtherApps: true) }
+
+        // Load the high-res bundle icon explicitly. When the binary is launched directly
+        // (e.g. from a terminal) rather than via LaunchServices, applicationIconImage is left
+        // as a low-res placeholder, so the standard About panel renders a blurry icon. Setting
+        // it from the .icns guarantees a crisp About/Dock icon regardless of launch path.
+        if let url = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+           let icon = NSImage(contentsOf: url) {
+            NSApp.applicationIconImage = icon
+        }
     }
 }
 
