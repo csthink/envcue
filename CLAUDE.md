@@ -13,7 +13,7 @@
 1. 自测:`swift build` / `swift test` / 该任务 DoD 指定的脚本或集成验证。
 2. 对照 `docs/tasks.md` 该任务的 DoD 逐条自验,并对照下方**六条不变量**自查。
 3. **若该任务命中安全门(G1/G2/G3),先过门再 commit**(见 `docs/workflow.md` §3,阻塞式)。
-4. 过了就 `git commit` 并 push。**Commit messages must be in English**,形如 `Tn: <short summary>`(如 `T1: add deterministic evaluate()`)。
+4. 过了就 `git commit` 并 push。**Commit messages must be in English**,形如 `Tn: <short summary>`(如 `T1: add deterministic evaluate()`),并带 `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` 尾注。
 5. 在下方"当前进度"清单勾选 Tn,直接进入下一个任务。
 
 不一口气连做多个任务(一次一个,做完收尾再进下一个)。不命中安全门的任务**不需要等评审**——自验 DoD 通过即可推进;**命中安全门的任务必须先过阻塞评审**。
