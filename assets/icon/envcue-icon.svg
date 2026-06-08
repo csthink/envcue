@@ -1,34 +1,14 @@
 <!--
-  EnvCue app-icon source (T5.5). Concept: the bash variable-expansion token
-  "${ }" with a block terminal cursor between the braces — signalling a shell
-  environment variable. Flat fills, no baked glass/shadow/highlight: Icon
-  Composer adds the Liquid Glass material and generates the four appearances.
+  EnvCue app-icon source (T5.5) — OUTLINED (font-independent paths; no <text>).
+  Concept: the bash variable-expansion token "${ }" with a block terminal cursor
+  between the braces = a shell environment variable. Glyphs outlined from
+  Menlo-Bold via CoreText. Flat fills, no baked glass — Icon Composer adds the
+  Liquid Glass material and the four appearances.
 
-  Before importing into Icon Composer:
-    1. Outline the <text> glyphs (Text -> Outlines) so they are font-independent
-       paths. The cursor is already a <rect>.
-    2. Import each group as its own layer for per-plate glass depth:
-         background / braces / dollar / cursor
-       ($ + cursor are the bright accent; braces are the mid-blue secondary.)
+  For Icon Composer: import the FOUR files under layers/ as separate layers
+  (bottom -> top): background / braces / dollar / cursor. Do NOT import this
+  combined file as a single layer (that double-applies glass over the background
+  and looks puffy). $ + cursor are the bright accent (#E3F2FD); braces are the
+  mid-blue secondary (#64B5F6); background is the indigo->royal-blue gradient.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img">
-  <defs>
-    <linearGradient id="backgroundGradient" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#1A237E"/>
-      <stop offset="1" stop-color="#0D47A1"/>
-    </linearGradient>
-  </defs>
-  <g id="background">
-    <rect x="0" y="0" width="1024" height="1024" fill="url(#backgroundGradient)"/>
-  </g>
-  <g id="dollar" fill="#E3F2FD">
-    <text x="172" y="512" font-family="SF Mono, Menlo, Courier New, monospace" font-size="430" font-weight="800" dominant-baseline="central" text-anchor="start">$</text>
-  </g>
-  <g id="braces" fill="#64B5F6">
-    <text x="374" y="512" font-family="SF Mono, Menlo, Courier New, monospace" font-size="430" font-weight="800" dominant-baseline="central" text-anchor="start">{</text>
-    <text x="720" y="512" font-family="SF Mono, Menlo, Courier New, monospace" font-size="430" font-weight="800" dominant-baseline="central" text-anchor="start">}</text>
-  </g>
-  <g id="cursor">
-    <rect x="556" y="362" width="118" height="300" rx="18" ry="18" fill="#E3F2FD"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1A237E"/><stop offset="1" stop-color="#0D47A1"/></linearGradient></defs><g id="background"><rect width="1024" height="1024" fill="url(#bg)"/></g><g id="braces" fill="#64B5F6"><path transform="translate(319,640)" d="M221.09 30.02 L221.09 70.13 L189.59 70.13 Q137.31 70.13 119.57 54.59 Q101.83 39.05 101.83 -7.35 L101.83 -52.49 Q101.83 -84.19 90.60 -96.27 Q79.37 -108.34 49.97 -108.34 L36.95 -108.34 L36.95 -148.44 L49.97 -148.44 Q79.37 -148.44 90.60 -160.41 Q101.83 -172.38 101.83 -204.29 L101.83 -249.43 Q101.83 -295.83 119.57 -311.27 Q137.31 -326.70 189.59 -326.70 L221.09 -326.70 L221.09 -286.81 L195.26 -286.81 Q173.43 -286.81 166.08 -277.99 Q158.73 -269.17 158.73 -239.15 L158.73 -195.26 Q158.73 -160.62 148.44 -146.55 Q138.15 -132.49 111.70 -128.50 Q138.15 -124.09 148.44 -109.81 Q158.73 -95.53 158.73 -61.10 L158.73 -18.06 Q158.73 12.18 166.08 21.10 Q173.43 30.02 195.26 30.02 Z"/><path transform="translate(679,640)" d="M37.79 30.02 L63.20 30.02 Q85.03 30.02 92.59 21.00 Q100.15 11.97 100.15 -18.06 L100.15 -61.10 Q100.15 -95.53 110.44 -109.81 Q120.73 -124.09 146.97 -128.50 Q120.52 -132.49 110.33 -146.55 Q100.15 -160.62 100.15 -195.26 L100.15 -239.15 Q100.15 -268.75 92.70 -277.78 Q85.24 -286.81 63.20 -286.81 L37.79 -286.81 L37.79 -326.70 L69.29 -326.70 Q121.36 -326.70 138.89 -311.27 Q156.42 -295.83 156.42 -249.43 L156.42 -204.29 Q156.42 -172.59 167.86 -160.52 Q179.31 -148.44 208.91 -148.44 L221.93 -148.44 L221.93 -108.34 L208.91 -108.34 Q179.31 -108.34 167.86 -96.16 Q156.42 -83.98 156.42 -52.49 L156.42 -7.35 Q156.42 39.05 138.89 54.59 Q121.36 70.13 69.29 70.13 L37.79 70.13 Z"/></g><g id="dollar" fill="#E3F2FD"><path transform="translate(89,640)" d="M145.71 -110.86 L145.71 -47.45 Q158.94 -49.34 166.29 -57.63 Q173.64 -65.93 173.64 -78.74 Q173.64 -91.75 166.39 -100.05 Q159.15 -108.34 145.71 -110.86 Z M116.11 -171.54 L116.11 -230.96 Q103.09 -229.28 96.48 -222.24 Q89.86 -215.21 89.86 -203.03 Q89.86 -191.06 96.48 -183.09 Q103.09 -175.11 116.11 -171.54 Z M145.71 63.20 L116.11 63.20 L115.90 -0.00 Q97.63 -0.63 77.69 -5.46 Q57.74 -10.29 36.11 -19.32 L36.11 -74.33 Q57.74 -61.52 78.00 -54.59 Q98.26 -47.66 116.11 -47.45 L116.11 -116.53 Q74.75 -124.72 54.59 -144.77 Q34.43 -164.82 34.43 -197.78 Q34.43 -232.85 55.85 -253.63 Q77.27 -274.42 116.11 -276.94 L116.11 -326.70 L145.71 -326.70 L145.92 -276.94 Q160.83 -276.10 176.89 -273.16 Q192.95 -270.22 209.75 -264.97 L209.75 -211.22 Q196.73 -219.62 180.78 -224.66 Q164.82 -229.70 145.71 -230.96 L145.71 -166.50 Q187.08 -159.99 208.18 -138.26 Q229.28 -116.53 229.28 -80.42 Q229.28 -45.98 206.50 -23.94 Q183.72 -1.89 145.92 -0.00 Z"/></g><g id="cursor"><rect x="569" y="362" width="118" height="300" rx="18" ry="18" fill="#E3F2FD"/></g></svg>
