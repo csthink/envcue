@@ -148,7 +148,11 @@ struct CLIContext {
 
     /// Serialize + fingerprint + manifest via Core, then commit atomically via Shell.
     func commitState(env: ResolvedEnv, activeScene: String?) throws {
-        let snapshot = EnvCueCore.serialize(env, activeScene: activeScene)
+        // Read what the previous snapshot exported BEFORE we overwrite the manifest, so the
+        // new snapshot can unset variables the old scene left behind (PROPOSAL-004). This is
+        // the only input that ties cleanup to the actually-sourced prior state.
+        let previousNames = previousManifestNames()
+        let snapshot = EnvCueCore.serialize(env, activeScene: activeScene, previousNames: previousNames)
         let generation = EnvCueCore.generation(env)
         let manifest = try buildManifest(env: env, active: activeScene, generation: generation)
         try EnvCueShell.writeState(
@@ -157,6 +161,19 @@ struct CLIContext {
             manifest: manifest,
             at: paths
         )
+    }
+
+    /// Variable names recorded in the last committed `manifest.json` (the env an
+    /// already-open shell most recently sourced). Empty when there is no prior manifest or
+    /// it cannot be read — the first apply has nothing to clean up. Only the `vars` keys
+    /// are needed; values there are already masked (invariant #2).
+    private func previousManifestNames() -> Set<String> {
+        guard let data = try? Data(contentsOf: paths.manifestFile),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let vars = obj["vars"] as? [String: Any] else {
+            return []
+        }
+        return Set(vars.keys)
     }
 
     // MARK: - Writing config & layer files (plaintext, user-owned)

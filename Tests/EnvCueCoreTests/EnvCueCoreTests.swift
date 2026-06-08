@@ -159,6 +159,53 @@ import Testing
     #expect(text.contains("→ ev'\\''il'"))
 }
 
+// MARK: - Serialize cleanup (PROPOSAL-004): unset vars left behind by the previous scene
+
+@Test func serializeUnsetsVarsGoneSincePreviousSnapshot() {
+    // Previous snapshot exported A, B, SECRET; the new env (base-only) has just A.
+    // B and SECRET must be unset so an already-open shell drops them on re-source.
+    let env = EnvCueCore.evaluate(base: Layer(name: "base", entries: [.plain("A", "1")]))
+    let text = EnvCueCore.serialize(env, activeScene: nil, previousNames: ["A", "B", "SECRET"])
+    #expect(text.contains("unset B 2>/dev/null"))
+    #expect(text.contains("unset SECRET 2>/dev/null"))
+    #expect(text.contains("export A=\"1\""))
+    #expect(!text.contains("unset A 2>/dev/null")) // still present → never unset
+}
+
+@Test func serializeCleanupSetEqualsDiffRemoved() {
+    // The binding the maintainer required (PROPOSAL-004 §3.1/§4): the snapshot's cleanup
+    // unsets are EXACTLY diff(previous, next).removed — what the user saw promised in the
+    // preview is what an already-open shell actually enacts. No independent recomputation.
+    let base = Layer(name: "base", entries: [.plain("EDITOR", "vim"), .plain("LEGACY", "1")])
+    let work = Layer(name: "work", entries: [
+        .plain("EDITOR", "code"), .plain("AWS_PROFILE", "prod"),
+        .unset("LEGACY"), .secret("WORK_TOKEN", account: "work/WORK_TOKEN"),
+    ])
+    let previous = EnvCueCore.evaluate(base: base, scene: work) // EDITOR, AWS_PROFILE, WORK_TOKEN
+    let next = EnvCueCore.evaluate(base: base)                   // EDITOR, LEGACY
+
+    let removed = Set(EnvCueCore.diff(current: previous, next: next)
+        .filter { $0.kind == .removed }.map { $0.name })        // AWS_PROFILE, WORK_TOKEN
+    let previousNames = Set(previous.vars.map { $0.entry.name })
+    let text = EnvCueCore.serialize(next, activeScene: nil, previousNames: previousNames)
+
+    #expect(removed == ["AWS_PROFILE", "WORK_TOKEN"])
+    for name in removed { #expect(text.contains("unset \(name) 2>/dev/null")) }
+    // Vars that merely changed or stayed are never unset.
+    #expect(!text.contains("unset EDITOR 2>/dev/null"))
+    #expect(!text.contains("unset LEGACY 2>/dev/null"))
+}
+
+@Test func serializeEmitsNoCleanupWhenNothingLeft() {
+    // Honest path (PROPOSAL-004 §3.2a): switching to an env with the same names (or a
+    // superset) adds no cleanup lines, so the snapshot/generation stay as if no history.
+    let env = EnvCueCore.evaluate(base: Layer(name: "base", entries: [.plain("A", "1"), .plain("B", "2")]))
+    let withHistory = EnvCueCore.serialize(env, activeScene: nil, previousNames: ["A", "B"])
+    let noHistory = EnvCueCore.serialize(env, activeScene: nil)
+    #expect(withHistory == noHistory)                  // byte-identical: no spurious unsets
+    #expect(!withHistory.contains("carried over"))     // cleanup comment absent
+}
+
 // MARK: - Generation (T1.6, invariant #5): content-only fingerprint, scene-name-free
 
 @Test func generationStableForSameContent() {
