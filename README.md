@@ -4,7 +4,7 @@
 
 > A menu-bar **scene switcher** for your shell environment on macOS — flip between global scenes like *personal* / *work* in one click, see which scene you're in from the menu bar at all times, and get an **honest, visible** notice in already-open terminals when a switch actually takes effect.
 
-**Status: M2 reached** (full CLI pipeline + the menu-bar Liquid Glass experience are usable); M3 (Homebrew distribution) is wrapping up. See the [roadmap](#roadmap).
+**Status: M3 reached** (v0.1.0 released — `brew install csthink/tap/envcue`). See the [roadmap](#roadmap).
 
 ---
 
@@ -107,7 +107,7 @@ Swift · SwiftUI `MenuBarExtra` · minimum macOS Tahoe 26 · Liquid Glass (all s
 |---|---|---|
 | **M1** | Full CLI pipeline (eval / secrets / snapshot / shim / subcommands) — usable day to day | ✅ |
 | **M2** | Menu-bar visibility + the Liquid Glass experience | ✅ |
-| **M3** | Homebrew distribution + bilingual README | 🚧 wrapping up |
+| **M3** | Homebrew distribution + bilingual README | ✅ |
 
 ## License
 
