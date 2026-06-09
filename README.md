@@ -1,81 +1,114 @@
+**English** · [中文](./README.zh-CN.md)
+
 # EnvCue
 
-> macOS 菜单栏 shell 环境**场景切换器** —— 在 personal / work 等全局场景间一键切换,菜单栏常驻显示当前在哪个场景,切换后对已开终端给出**诚实可见**的生效提示。
+> A menu-bar **scene switcher** for your shell environment on macOS — flip between global scenes like *personal* / *work* in one click, see which scene you're in from the menu bar at all times, and get an **honest, visible** notice in already-open terminals when a switch actually takes effect.
 
-**状态:开发中**(设计已定稿,实现进行中;里程碑见下方[路线图](#路线图))。
+**Status: M2 reached** (full CLI pipeline + the menu-bar Liquid Glass experience are usable); M3 (Homebrew distribution) is wrapping up. See the [roadmap](#roadmap).
 
 ---
 
-## 为什么
+## Why
 
-你可能也把 alias、插件、各 SDK 配置、以及多套需要切换的环境(个人/公司不同的 LLM API_KEY、不同 JDK……)全塞进一份 `~/.zshrc`。于是:
+Like many people, you may have piled aliases, plugins, SDK config, and several switchable environments (different LLM `API_KEY`s for personal vs. company, different JDKs…) into a single `~/.zshrc`. The result:
 
-1. **不知道此刻用的是哪套** —— 得 `echo $API_KEY` 才能确认。
-2. **切换全靠手改 / 靠变量命名约定** —— 不直观、易错。
-3. **密钥明文躺在 dotfile 里** —— 有泄露风险。
+1. **You can't tell which set is active right now** — you have to `echo $API_KEY` to be sure.
+2. **Switching means hand-editing or naming conventions** — unintuitive and error-prone.
+3. **Secrets sit in plaintext in a dotfile** — a leak risk.
 
-EnvCue 解决的就是这三点:**可见性**(菜单栏随时显示当前场景)、**安全**(密钥进 Keychain,明文不落盘)、**诚实**(任何切换都给明确可见的生效路径,绝不假装热加载成功)。
+EnvCue fixes exactly these three: **visibility** (the menu bar always shows the current scene), **safety** (secrets live in the Keychain, never on disk in plaintext), and **honesty** (every switch gives a clear, visible path to taking effect — it never pretends a hot-reload succeeded).
 
-## 定位:整合 + 可见性 + 诚实,不造轮子
+## Where it fits: integration + visibility + honesty, not reinvention
 
-EnvCue 坐在 [mise](https://mise.jdx.dev/) / [direnv](https://direnv.net/) 之上,只做整个品类都空着的两件事 —— **可见性** 与 **诚实**。它**永不碰 PATH**:
+EnvCue sits *on top of* [mise](https://mise.jdx.dev/) / [direnv](https://direnv.net/) and does only the two things the whole category leaves empty — **visibility** and **honesty**. It **never touches PATH**:
 
-| 关注点 | 谁来做 |
+| Concern | Owner |
 |---|---|
-| PATH / 版本 / 按目录加载 | **委托 mise·direnv**,EnvCue 永不写 PATH |
-| 密钥存储 | macOS **Keychain**(工具自身不持有、不落盘明文) |
-| 场景定义 → 求值 → 写快照 → shell 读取生效 → 诚实提示 | **EnvCue** |
+| PATH / versions / per-directory loading | **Delegated to mise·direnv** — EnvCue never writes PATH |
+| Secret storage | macOS **Keychain** (the tool never holds or writes plaintext) |
+| Scene definition → evaluation → snapshot → shell picks it up → honest notice | **EnvCue** |
 
-## 核心设计原则
+## Core design principles
 
-- **机密与配置分家**:API key 进 Keychain(只存引用,source 时实时取);普通环境变量进 `~/.config/envcue/`(TOML 明文、可分享、手改友好)。**任何盘上文件都没有明文密钥。**
-- **确定性、可追溯的求值**:任何变量的最终值都能一眼追溯来自哪一层(`base` 还是当前 `scene`),没有隐式优先级。
-- **承认物理约束**:运行中的 shell 无法被外部改写环境。EnvCue 只控制 (a) 下一个 shell 启动读到什么,(b) 已开终端在下一个 prompt 重读 —— 并且**只在本终端真受影响时,打印一次性单行提示**,从不谎报。
+- **Secrets and config live apart.** API keys go in the Keychain (only a reference is stored; the real value is fetched at `source` time); ordinary env vars go in `~/.config/envcue/` (plaintext TOML, shareable, hand-edit friendly). **No file on disk ever holds a plaintext secret.**
+- **Deterministic, traceable evaluation.** Every variable's final value traces back to exactly one layer (`base` or the active `scene`) — no implicit precedence.
+- **It respects physics.** A running shell can't have its environment rewritten from outside. EnvCue only controls (a) what the *next* shell reads at startup, and (b) re-reads in an already-open terminal on its next prompt — and **prints a one-shot single-line notice only when that terminal is genuinely affected**. It never lies.
 
-## 它如何工作(概览)
+## How it works (overview)
 
 ```
-场景定义 (base + scene, TOML)
-        │  求值(纯函数,base < scene 叠加)
+Scene definitions (base + scene, TOML)
+        │  evaluate (pure function, base < scene overlay)
         ▼
-   原子写快照 snapshot.zsh  +  generation 指纹
+   atomic snapshot.zsh  +  generation fingerprint
         │
-        ├─ 新 shell 启动 → .zshrc shim 自动 source
-        └─ 已开终端下个 prompt → precmd hook 检测 generation
-                                 变了才重读(才取密钥)→ 打印一次诚实提示
+        ├─ new shell starts → .zshrc shim sources it
+        └─ open terminal, next prompt → precmd hook checks generation;
+                                        re-reads (and fetches secrets) only if it changed,
+                                        then prints one honest notice
 ```
 
-- 密钥在快照里只是 `$(envcue keychain-get ...)` 引用,真值经 stdout 管道进 shell —— **不进 argv、不进 history**。
-- `generation` 只对**环境内容**取指纹(不含场景名):两个场景若解析出的环境完全相同,切换**不会**打提示(因为这个终端的环境确实没变)。
+- In the snapshot a secret is only a `$(envcue keychain-get ...)` reference; the real value travels through an stdout pipe into the shell — **never through argv or history**.
+- `generation` fingerprints the **environment content only** (not the scene name): if two scenes resolve to the same environment, switching prints **no** notice (because this terminal's environment truly didn't change).
+- When you switch scenes, variables that belonged only to the previous scene (secrets included) are `unset` on an open terminal's next prompt — what the diff preview promises to remove is actually removed.
 
-## 范围(v1)
+## Scope (v1)
 
-**做:** 仅 macOS(Tahoe 26+)/ 仅 zsh;`base + scene` 层模型(scene 互斥,同一时刻一个);Keychain 密钥后端;切换前 diff 预览;菜单栏可见性(SwiftUI + Liquid Glass)。
+**In:** macOS only (Tahoe 26+) / zsh only; a `base + scene` layer model (scenes are mutually exclusive — one at a time); Keychain secret backend; a pre-switch diff preview; menu-bar visibility (SwiftUI + Liquid Glass).
 
-**不做(明确推迟,数据模型预留):** 多 scene 自由叠加、mise/direnv 可视化管理、常驻 prompt 段、版本切换(JDK 等)、GUI 应用环境注入、bash/fish、远程同步/团队协作。**自己做按目录加载或任何 PATH 操作 —— 永久不做,委托 mise·direnv。**
+**Out (explicitly deferred; the data model reserves room):** freely stacking multiple scenes, a mise/direnv management UI, a persistent prompt segment, version switching (JDK, etc.), injecting env into GUI apps, bash/fish, remote sync / team features. **Per-directory loading or any PATH manipulation — never, by design; delegated to mise·direnv.**
 
-## 安装
+## Install
 
-> 尚未发布。M3 完成后将提供 Homebrew 分发:
->
-> ```sh
-> brew install csthink/tap/envcue
-> ```
->
-> 届时一并补上英文 `README.md` 与 `README.zh-CN.md`。
+Via Homebrew (the csthink tap):
 
-## 技术栈
+```sh
+brew install csthink/tap/envcue
+```
 
-Swift · SwiftUI `MenuBarExtra` · 最低 macOS Tahoe 26 · Liquid Glass(全用系统材质,不自绘)· 单二进制双模式(菜单栏 `.app` + `envcue` CLI)· macOS Keychain。
+This is a **source-build** formula: it compiles on your machine with **Xcode 26** and requires **macOS Tahoe 26+**. After installing:
 
-## 路线图
+```sh
+# Launch the menu-bar app (add it to Login Items to start at login)
+open "$(brew --prefix)/opt/envcue/EnvCue.app"
 
-| 里程碑 | 内容 | 状态 |
+# Enable the per-terminal shim (idempotent — only touches the block between paired
+# anchors in ~/.zshrc), then open a new terminal
+envcue install
+```
+
+The `envcue` CLI is on your PATH after `brew install`; the menu-bar app and the CLI share one binary and one apply path.
+
+## Quick start (CLI)
+
+```sh
+# Store a secret in a scene (read from stdin — never argv / history)
+printf %s "$OPENAI_API_KEY" | envcue secret set personal OPENAI_API_KEY
+
+# Preview what switching to a scene would change (secrets shown as references, not plaintext)
+envcue diff work
+
+# Switch scene (eval → diff → confirm → atomic write)
+envcue scene work
+
+# Show the active scene / generation / snapshot path
+envcue status
+```
+
+Config lives in `~/.config/envcue/` (`base.toml` + `scenes/<name>.toml`, shareable plaintext TOML); generated state lives in `~/.config/envcue/state/` (snapshot / generation / manifest — **do not hand-edit**).
+
+## Tech stack
+
+Swift · SwiftUI `MenuBarExtra` · minimum macOS Tahoe 26 · Liquid Glass (all system materials, nothing self-drawn) · one binary, two modes (the menu-bar `.app` + the `envcue` CLI) · macOS Keychain.
+
+## Roadmap
+
+| Milestone | Scope | Status |
 |---|---|---|
-| **M1** | CLI 全链路(求值 / 密钥 / 快照 / shim / 子命令)—— 可日常自用 | 🚧 进行中 |
-| **M2** | 菜单栏可见性 + Liquid Glass 体验 | ⏳ |
-| **M3** | Homebrew 分发 + 双语 README | ⏳ |
+| **M1** | Full CLI pipeline (eval / secrets / snapshot / shim / subcommands) — usable day to day | ✅ |
+| **M2** | Menu-bar visibility + the Liquid Glass experience | ✅ |
+| **M3** | Homebrew distribution + bilingual README | 🚧 wrapping up |
 
-## 许可
+## License
 
 [MIT](./LICENSE) © 2026 Mars
